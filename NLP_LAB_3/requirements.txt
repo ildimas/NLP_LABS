@@ -1,0 +1,10 @@
+torch==1.12.1
+torchvision==0.13.1
+numpy>=1.23
+pandas>=1.5
+scikit-learn>=1.1
+tqdm>=4.64
+seqeval>=1.2
+overrides==3.1.0
+razdel>=0.5.0
+allennlp==2.10.1
