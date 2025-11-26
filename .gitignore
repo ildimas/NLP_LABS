@@ -1,2 +1,8 @@
 data
 models
+outputs
+NLP_LAB_4/data.zip
+NLP_LAB_4/models.zip
+runs
+cache_dir
+.venv
