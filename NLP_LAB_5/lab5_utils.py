@@ -16,6 +16,7 @@ from transformers import (
     Seq2SeqTrainingArguments,
     set_seed,
 )
+from rouge_score import rouge_scorer, scoring
 import evaluate
 
 MAX_SOURCE_LENGTH = 512
@@ -95,11 +96,43 @@ def build_compute_metrics(tokenizer):
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-        result = rouge.compute(
-            predictions=decoded_preds,
-            references=decoded_labels,
-            use_stemmer=True,
-        )
+        def _sanitize_text(values):
+            cleaned = []
+            for value in values:
+                if value is None:
+                    cleaned.append("")
+                elif isinstance(value, str):
+                    cleaned.append(value.strip())
+                else:
+                    cleaned.append(str(value))
+            return cleaned
+
+        decoded_preds = _sanitize_text(decoded_preds)
+        decoded_labels = _sanitize_text(decoded_labels)
+        if len(decoded_preds) != len(decoded_labels):
+            size = min(len(decoded_preds), len(decoded_labels))
+            decoded_preds = decoded_preds[:size]
+            decoded_labels = decoded_labels[:size]
+
+        try:
+            result = rouge.compute(
+                predictions=decoded_preds,
+                references=decoded_labels,
+                use_stemmer=True,
+            )
+        except ValueError:
+            scorer = rouge_scorer.RougeScorer(
+                ["rouge1", "rouge2", "rougeL", "rougeLsum"],
+                use_stemmer=True,
+            )
+            aggregator = scoring.BootstrapAggregator()
+            for pred, label in zip(decoded_preds, decoded_labels):
+                aggregator.add_scores(scorer.score(target=label, prediction=pred))
+            aggregated = aggregator.aggregate()
+            result = {
+                key: round(value.mid.fmeasure, 4)
+                for key, value in aggregated.items()
+            }
         prediction_lens = [
             np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions
         ]
